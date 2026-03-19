@@ -1,0 +1,20 @@
+{
+  "name": "frontend_creator",
+  "version": "1.0.0",
+  "description": "",
+  "main": "renderer.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "api": "node api-server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "ajv": "^8.18.0",
+    "fs-extra": "^11.3.4",
+    "handlebars": "^4.7.8",
+    "yargs": "^18.0.0"
+  }
+}

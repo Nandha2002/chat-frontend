@@ -1,0 +1,23 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Template Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name", "id", "version", "description", "engine", "entrypoint", "schema"],
+  "properties": {
+    "name": { "type": "string" },
+    "id": { "type": "string" },
+    "version": { "type": "string" },
+    "description": { "type": "string" },
+    "engine": { "type": "string", "enum": ["handlebars"] },
+    "entrypoint": { "type": "string" },
+    "schema": { "type": "string" },
+    "hooks": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "pre_render": { "type": "string" }
+      }
+    }
+  }
+}

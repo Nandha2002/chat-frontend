@@ -1,0 +1,51 @@
+{
+  "template": {
+    "id": "Template_style1",
+    "name": "Template_style1",
+    "description": "React + Vite app with chat UI, predefined questions, and theme toggle.",
+    "templatePath": "./templates/Template_style1",
+    "schemaPath": "./templates/Template_style1/schema.json",
+    "defaultValuesPath": "./templates/Template_style1/values.json"
+  },
+  "configuration": {
+    "appName": "My Chat",
+    "primaryColor": "orange",
+    "accentColor": "#1e90ff",
+    "links": [
+      {
+        "label": "Home",
+        "href": "/"
+      },
+      {
+        "label": "Docs",
+        "href": "#"
+      }
+    ],
+    "logoPath": "/src/assets/logo.svg",
+    "predefinedQuestions": [
+      "What can you do?",
+      "Summarize the latest updates.",
+      "Help me write an email."
+    ],
+    "theme": "dark",
+    "chatOptions": {
+      "placeholder": "Type a message…",
+      "showTimestamps": true
+    },
+    "ragConfig": {
+      "chunkSize": 800,
+      "embeddingModel": "text-embedding-3-small",
+      "searchMethod": "hybrid",
+      "systemPrompt": "You are a helpful assistant. Use retrieved context first and cite relevant information when possible.",
+      "llmChoice": "gpt-4o-mini",
+      "temperature": 0.2
+    }
+  },
+  "renderOptions": {
+    "out": null,
+    "open": true
+  },
+  "source": "dashboard-render-submit",
+  "requestedAt": "2026-03-19T16:23:45.772Z",
+  "receivedAt": "2026-03-19T16:23:45.773Z"
+}

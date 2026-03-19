@@ -1,0 +1,27 @@
+{
+  "appName": "HRVA Chat",
+  "primaryColor": "orange",
+  "accentColor": "#1e90ff",
+  "logoPath": "/src/assets/logo.svg",
+  "links": [
+    { "label": "Home", "href": "/" },
+    { "label": "Docs", "href": "#" }
+  ],
+  "predefinedQuestions": [
+    "What can you do?",
+    "Summarize the latest updates.",
+    "Help me write an email."
+  ],
+  "chatOptions": {
+    "placeholder": "Ask something…",
+    "showTimestamps": true
+  },
+  "ragConfig": {
+    "chunkSize": 800,
+    "embeddingModel": "text-embedding-3-small",
+    "searchMethod": "hybrid",
+    "systemPrompt": "You are a helpful assistant. Use retrieved context first and cite relevant information when possible.",
+    "llmChoice": "gpt-4o-mini",
+    "temperature": 0.2
+  }
+}

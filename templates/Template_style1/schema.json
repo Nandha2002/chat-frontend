@@ -1,0 +1,154 @@
+{
+  "title": "Template_style1 Config",
+  "type": "object",
+  "required": [
+    "appName",
+    "primaryColor",
+    "predefinedQuestions"
+  ],
+  "properties": {
+    "appName": {
+      "type": "string",
+      "title": "App Name",
+      "default": "My Chat"
+    },
+    "primaryColor": {
+      "type": "string",
+      "title": "Primary Color",
+      "default": "orange",
+      "pattern": "^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$|^[a-zA-Z]+$"
+    },
+    "accentColor": {
+      "type": "string",
+      "title": "Accent Color",
+      "default": "#1e90ff",
+      "pattern": "^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$|^[a-zA-Z]+$"
+    },
+    "links": {
+      "type": "array",
+      "title": "Nav Links",
+      "items": {
+        "type": "object",
+        "required": [
+          "label",
+          "href"
+        ],
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "href": {
+            "type": "string"
+          }
+        }
+      },
+      "default": [
+        {
+          "label": "Home",
+          "href": "/"
+        },
+        {
+          "label": "Docs",
+          "href": "#"
+        }
+      ]
+    },
+    "logoPath": {
+      "type": "string",
+      "title": "Logo path (optional)",
+      "default": "/src/assets/logo.svg"
+    },
+    "predefinedQuestions": {
+      "type": "array",
+      "title": "Predefined Questions",
+      "items": {
+        "type": "string"
+      },
+      "default": [
+        "What can you do?",
+        "Summarize the latest updates.",
+        "Help me write an email."
+      ],
+      "minItems": 1
+    },
+    "theme": { 
+      "type": "string", 
+      "enum": ["dark","light"], 
+      "default": "dark" 
+    },
+    "chatOptions": {
+      "type": "object",
+      "title": "Chat Options",
+      "properties": {
+        "placeholder": {
+          "type": "string",
+          "default": "Type a message\u2026"
+        },
+        "showTimestamps": {
+          "type": "boolean",
+          "default": true
+        }
+      }
+    },
+    "ragConfig": {
+      "type": "object",
+      "title": "RAG Configuration",
+      "properties": {
+        "chunkSize": {
+          "type": "integer",
+          "title": "Chunk Size",
+          "default": 800,
+          "minimum": 50
+        },
+        "embeddingModel": {
+          "type": "string",
+          "title": "Embedding Model",
+          "enum": [
+            "text-embedding-3-small",
+            "text-embedding-3-large",
+            "all-MiniLM-L6-v2",
+            "bge-base-en-v1.5"
+          ],
+          "x-allowCustom": true,
+          "default": "text-embedding-3-small"
+        },
+        "searchMethod": {
+          "type": "string",
+          "title": "Search Method",
+          "enum": [
+            "vector",
+            "keyword",
+            "hybrid",
+            "semantic-hybrid"
+          ],
+          "x-allowCustom": true,
+          "default": "hybrid"
+        },
+        "systemPrompt": {
+          "type": "string",
+          "title": "System Prompt",
+          "default": "You are a helpful assistant. Use retrieved context first and cite relevant information when possible."
+        },
+        "llmChoice": {
+          "type": "string",
+          "title": "LLM Choice",
+          "enum": [
+            "gpt-4o-mini",
+            "gpt-4.1-mini",
+            "gpt-4.1",
+            "llama-3.1-70b"
+          ],
+          "x-allowCustom": true,
+          "default": "gpt-4o-mini"
+        },
+        "temperature": {
+          "type": "number",
+          "title": "Temperature",
+          "default": 0.2,
+          "minimum": 0,
+          "maximum": 2
+        }
+      }
+    }
+  }
+}

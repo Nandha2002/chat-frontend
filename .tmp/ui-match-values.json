@@ -1,0 +1,20 @@
+{
+  "appName": "HR Virtual Assistant",
+  "primaryColor": "#148c67",
+  "accentColor": "#2b8f75",
+  "logoPath": "/src/assets/logo.svg",
+  "links": [
+    { "label": "Home", "href": "/" },
+    { "label": "Docs", "href": "#" }
+  ],
+  "predefinedQuestions": [
+    "How does WFA affect employees?",
+    "What are my options if I have received a notification of affected status?",
+    "What is workforce adjustment?"
+  ],
+  "theme": "light",
+  "chatOptions": {
+    "placeholder": "Enter a message...",
+    "showTimestamps": true
+  }
+}

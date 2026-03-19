@@ -1,0 +1,10 @@
+# yaml-language-server: $schema=../../template-manifest.schema.json
+name: Template_style1
+id: Template_style1
+version: 0.1.0
+description: React + Vite app with a nav bar, chat UI, and predefined questions.
+engine: handlebars
+entrypoint: files/
+schema: schema.json
+hooks:
+  pre_render: hooks/pre_render.js

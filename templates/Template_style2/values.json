@@ -1,0 +1,27 @@
+{
+  "pageTitle": "HR Virtual Assistant",
+  "headline": "What's on your mind today?",
+  "primaryColor": "#148c67",
+  "secondaryColor": "#d9d9d9",
+  "chatbotName": "Document Assistant",
+  "uploadLabel": "Upload documents",
+  "uploadHint": "PDF, DOCX, TXT",
+  "welcomePrompts": [
+    "Summarize this document",
+    "Find policy changes",
+    "Draft a response"
+  ],
+  "acceptedFileTypes": [
+    ".pdf",
+    ".docx",
+    ".txt"
+  ],
+  "ragConfig": {
+    "chunkSize": 800,
+    "embeddingModel": "text-embedding-3-small",
+    "searchMethod": "hybrid",
+    "systemPrompt": "You are a helpful assistant. Use retrieved context first and cite relevant information when possible.",
+    "llmChoice": "gpt-4o-mini",
+    "temperature": 0.2
+  }
+}

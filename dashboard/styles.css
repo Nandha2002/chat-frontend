@@ -1,0 +1,268 @@
+:root {
+  --bg: #f4efe7;
+  --ink: #2a2437;
+  --muted: #625976;
+  --panel: #fffdf9;
+  --line: #e2d8c7;
+  --accent: #d86f2d;
+  --accent-2: #1f6f8b;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--ink);
+  background:
+    radial-gradient(1200px 400px at 10% -10%, #ffdcb8, transparent 60%),
+    radial-gradient(1200px 400px at 100% 0%, #bddff0, transparent 60%),
+    var(--bg);
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+}
+
+.bg-orb {
+  position: fixed;
+  width: 240px;
+  height: 240px;
+  border-radius: 50%;
+  filter: blur(40px);
+  opacity: 0.25;
+  z-index: 0;
+}
+
+.orb-a { top: -40px; left: -40px; background: #f8b86a; }
+.orb-b { right: -40px; bottom: -40px; background: #77b3ce; }
+
+.topbar,
+.layout {
+  position: relative;
+  z-index: 1;
+}
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: end;
+  padding: 24px;
+}
+
+.eyebrow {
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+h1 {
+  margin: 4px 0 0;
+  font-size: clamp(24px, 4vw, 42px);
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 16px;
+  padding: 0 24px 24px;
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  box-shadow: 0 14px 24px rgba(48, 39, 25, 0.08);
+}
+
+.panel-head {
+  padding: 16px 16px 10px;
+  border-bottom: 1px solid var(--line);
+}
+
+.panel-head h2 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.template-list {
+  padding: 12px;
+  display: grid;
+  gap: 10px;
+}
+
+.instance-list {
+  padding: 12px;
+  display: grid;
+  gap: 10px;
+}
+
+.panel-head-sub {
+  border-top: 1px solid var(--line);
+}
+
+.template-card {
+  width: 100%;
+  text-align: left;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px;
+  cursor: pointer;
+}
+
+.template-card.active {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.template-card h3 {
+  margin: 0 0 4px;
+  font-size: 14px;
+}
+
+.template-card p {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.instance-card {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.instance-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.instance-meta {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.instance-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.mini-btn {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 7px 10px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.mini-btn.primary {
+  background: #f7ebe0;
+  border-color: #e8c8a7;
+}
+
+.render-form {
+  padding: 16px;
+  display: grid;
+  gap: 14px;
+}
+
+.form-fields {
+  display: grid;
+  gap: 12px;
+}
+
+.field-row {
+  display: grid;
+  gap: 6px;
+}
+
+label {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+input,
+select,
+textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+}
+
+textarea {
+  min-height: 88px;
+  resize: vertical;
+  font-family: "Cascadia Mono", Consolas, monospace;
+  font-size: 12px;
+}
+
+.fieldset {
+  border: 1px dashed var(--line);
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.fieldset > .legend {
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.actions {
+  display: flex;
+  gap: 10px;
+}
+
+.primary-btn,
+.ghost-btn {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 10px 14px;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.primary-btn {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #1f140e;
+}
+
+.ghost-btn {
+  background: #fff;
+  color: var(--ink);
+}
+
+.primary-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.status {
+  margin: 0 16px 16px;
+  padding: 12px;
+  background: #f9f4eb;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: #4a3f2d;
+  max-height: 220px;
+  overflow: auto;
+  font: 12px/1.35 "Cascadia Mono", Consolas, monospace;
+}
+
+@media (max-width: 900px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+}

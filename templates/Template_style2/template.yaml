@@ -1,0 +1,8 @@
+# yaml-language-server: $schema=../../template-manifest.schema.json
+name: Template_style2
+id: Template_style2
+version: 0.1.0
+description: React + Vite app with file upload, document chat, and prompt suggestions.
+engine: handlebars
+entrypoint: files/
+schema: schema.json

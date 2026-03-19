@@ -1,0 +1,92 @@
+import React, { useState } from 'react'
+import NavBar from './components/NavBar.jsx'
+import Chat from './components/Chat.jsx'
+
+// Injects scaffold-time values from Handlebars into runtime config.
+const CONFIG = {
+  appName: "{{appName}}",
+  primaryColor: "{{primaryColor}}",
+  accentColor: "{{accentColor}}",
+  logoPath: "{{logoPath}}",
+  links: [
+    {{#each links}}
+    { label: "{{this.label}}", href: "{{this.href}}" }{{#unless @last}},{{/unless}}
+    {{/each}}
+  ],
+  predefinedQuestions: [
+    {{#each predefinedQuestions}}
+    "{{this}}"{{#unless @last}},{{/unless}}
+    {{/each}}
+  ],
+  chatOptions: {
+    placeholder: "{{chatOptions.placeholder}}",
+    showTimestamps: {{#if chatOptions.showTimestamps}}true{{else}}false{{/if}}
+  },
+  // RAG settings are captured at render time and available for backend/API wiring.
+  ragConfig: {
+    chunkSize: {{ragConfig.chunkSize}},
+    embeddingModel: "{{ragConfig.embeddingModel}}",
+    searchMethod: "{{ragConfig.searchMethod}}",
+    systemPrompt: "{{ragConfig.systemPrompt}}",
+    llmChoice: "{{ragConfig.llmChoice}}",
+    temperature: {{ragConfig.temperature}}
+  }
+}
+
+// Main shell component for chat experience and theme state.
+export default function App() {
+  const [theme, setTheme] = useState("{{#if theme}}{{theme}}{{else}}dark{{/if}}")
+  const [messages, setMessages] = useState([])
+
+  // Toggles between dark and light UI modes.
+  const toggleTheme = () => {
+    setTheme((t) => (t === 'dark' ? 'light' : 'dark'))
+  }
+
+  // Clears current conversation history.
+  const resetConversation = () => {
+    setMessages([])
+  }
+
+  // Adds a user message and a simple assistant echo response.
+  const sendMessage = (text) => {
+    if (!text.trim()) return
+    const now = new Date()
+    setMessages(m => [
+      ...m,
+      { role: 'user', content: text, ts: now.toISOString() },
+      {
+        role: 'assistant',
+        content: `I can help with that. Here is a starting point for "${text}".`,
+        ts: now.toISOString()
+      }
+    ])
+  }
+
+  return (
+    <div className="app-shell" data-theme={theme}>
+      <NavBar
+        appName={CONFIG.appName}
+        logoPath={CONFIG.logoPath}
+        links={CONFIG.links}
+        theme={theme}
+        onToggleTheme={toggleTheme}
+        onReset={resetConversation}
+      />
+      <main className="workspace">
+        <section className="experience-panel">
+          <Chat
+            appName={CONFIG.appName}
+            messages={messages}
+            onSend={sendMessage}
+            onReset={resetConversation}
+            questions={CONFIG.predefinedQuestions}
+            placeholder={CONFIG.chatOptions.placeholder}
+            showTimestamps={CONFIG.chatOptions.showTimestamps}
+            ragConfig={CONFIG.ragConfig}
+          />
+        </section>
+      </main>
+    </div>
+  )
+}

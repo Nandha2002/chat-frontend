@@ -1,0 +1,29 @@
+{
+  "name": "rerender-same-folder",
+  "templateId": "Template_style2",
+  "values": {
+    "pageTitle": "Demo",
+    "headline": "H",
+    "primaryColor": "#148c67",
+    "secondaryColor": "#d9d9d9",
+    "chatbotName": "Bot",
+    "uploadLabel": "Upload",
+    "uploadHint": "hint",
+    "welcomePrompts": [
+      "a"
+    ],
+    "acceptedFileTypes": [
+      ".pdf"
+    ],
+    "ragConfig": {
+      "chunkSize": 800,
+      "embeddingModel": "text-embedding-3-small",
+      "searchMethod": "hybrid",
+      "systemPrompt": "x",
+      "llmChoice": "gpt-4o-mini",
+      "temperature": 0.1
+    }
+  },
+  "createdAt": "2026-03-19T16:02:35.138Z",
+  "updatedAt": "2026-03-19T16:02:35.138Z"
+}

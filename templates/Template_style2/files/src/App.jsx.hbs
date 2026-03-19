@@ -1,0 +1,58 @@
+import React, { useState } from 'react'
+import FileUpload from './components/FileUpload.jsx'
+
+// Injects scaffold-time values from Handlebars into runtime config.
+const CONFIG = {
+  pageTitle: "{{pageTitle}}",
+  headline: "{{headline}}",
+  primaryColor: "{{primaryColor}}",
+  secondaryColor: "{{#if secondaryColor}}{{secondaryColor}}{{else}}#6ea8ff{{/if}}",
+  chatbotName: "{{chatbotName}}",
+  uploadLabel: "{{uploadLabel}}",
+  uploadHint: "{{uploadHint}}",
+  welcomePrompts: [
+    {{#each welcomePrompts}}
+    "{{this}}"{{#unless @last}},{{/unless}}
+    {{/each}}
+  ],
+  acceptedFileTypes: [
+    {{#each acceptedFileTypes}}
+    "{{this}}"{{#unless @last}},{{/unless}}
+    {{/each}}
+  ],
+  // RAG settings are captured at render time and available for backend/API wiring.
+  ragConfig: {
+    chunkSize: {{ragConfig.chunkSize}},
+    embeddingModel: "{{ragConfig.embeddingModel}}",
+    searchMethod: "{{ragConfig.searchMethod}}",
+    systemPrompt: "{{ragConfig.systemPrompt}}",
+    llmChoice: "{{ragConfig.llmChoice}}",
+    temperature: {{ragConfig.temperature}}
+  }
+}
+
+// Main shell for chat-first flow with optional document upload.
+export default function App() {
+  const [uploadedFile, setUploadedFile] = useState(null)
+
+  // Stores the selected document for context-aware answers.
+  const handleFileUpload = (file) => {
+    setUploadedFile(file)
+  }
+
+  return (
+    <div className="app-container">
+      <FileUpload
+        file={uploadedFile}
+        chatbotName={CONFIG.chatbotName}
+        primaryColor={CONFIG.primaryColor}
+        secondaryColor={CONFIG.secondaryColor}
+        ragConfig={CONFIG.ragConfig}
+        uploadLabel={CONFIG.uploadLabel}
+        uploadHint={CONFIG.uploadHint}
+        acceptedFileTypes={CONFIG.acceptedFileTypes}
+        onFileSelect={handleFileUpload}
+      />
+    </div>
+  )
+}

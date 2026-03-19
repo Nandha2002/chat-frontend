@@ -1,0 +1,20 @@
+{
+  "configuration": {
+    "appName": "HistoryTest",
+    "ragConfig": {
+      "temperature": 0.4,
+      "chunkSize": 700
+    }
+  },
+  "template": {
+    "id": "Template_style2",
+    "name": "Template style 2"
+  },
+  "requestedAt": "2026-03-19T12:23:03.3893596-04:00",
+  "source": "history-check",
+  "renderOptions": {
+    "open": true,
+    "out": "history-test"
+  },
+  "receivedAt": "2026-03-19T16:23:03.395Z"
+}

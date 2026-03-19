@@ -1,0 +1,120 @@
+{
+  "title": "Template_style2 Config",
+  "type": "object",
+  "required": ["pageTitle", "headline", "primaryColor", "chatbotName"],
+  "properties": {
+    "pageTitle": {
+      "type": "string",
+      "title": "Page Title",
+      "default": "Starter Landing"
+    },
+    "headline": {
+      "type": "string",
+      "title": "Headline",
+      "default": "Ship your template fast"
+    },
+    "primaryColor": {
+      "type": "string",
+      "title": "Primary Color",
+      "default": "#ff8c00",
+      "pattern": "^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$|^[a-zA-Z]+$"
+    },
+    "secondaryColor": {
+      "type": "string",
+      "title": "Secondary Color",
+      "default": "#6ea8ff",
+      "pattern": "^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$|^[a-zA-Z]+$"
+    },
+    "chatbotName": {
+      "type": "string",
+      "title": "Chatbot Name",
+      "default": "Concierge AI"
+    },
+    "uploadLabel": {
+      "type": "string",
+      "title": "Upload Label",
+      "default": "Upload documents"
+    },
+    "uploadHint": {
+      "type": "string",
+      "title": "Upload Hint",
+      "default": "PDF, DOCX, TXT"
+    },
+    "welcomePrompts": {
+      "type": "array",
+      "title": "Welcome Prompt Chips",
+      "items": { "type": "string" },
+      "default": [
+        "Summarize this document",
+        "Find policy changes",
+        "Draft a response"
+      ]
+    },
+    "acceptedFileTypes": {
+      "type": "array",
+      "title": "Accepted File Types",
+      "items": { "type": "string" },
+      "default": [".pdf", ".docx", ".txt"]
+    },
+    "ragConfig": {
+      "type": "object",
+      "title": "RAG Configuration",
+      "properties": {
+        "chunkSize": {
+          "type": "integer",
+          "title": "Chunk Size",
+          "default": 800,
+          "minimum": 50
+        },
+        "embeddingModel": {
+          "type": "string",
+          "title": "Embedding Model",
+          "enum": [
+            "text-embedding-3-small",
+            "text-embedding-3-large",
+            "all-MiniLM-L6-v2",
+            "bge-base-en-v1.5"
+          ],
+          "x-allowCustom": true,
+          "default": "text-embedding-3-small"
+        },
+        "searchMethod": {
+          "type": "string",
+          "title": "Search Method",
+          "enum": [
+            "vector",
+            "keyword",
+            "hybrid",
+            "semantic-hybrid"
+          ],
+          "x-allowCustom": true,
+          "default": "hybrid"
+        },
+        "systemPrompt": {
+          "type": "string",
+          "title": "System Prompt",
+          "default": "You are a helpful assistant. Use retrieved context first and cite relevant information when possible."
+        },
+        "llmChoice": {
+          "type": "string",
+          "title": "LLM Choice",
+          "enum": [
+            "gpt-4o-mini",
+            "gpt-4.1-mini",
+            "gpt-4.1",
+            "llama-3.1-70b"
+          ],
+          "x-allowCustom": true,
+          "default": "gpt-4o-mini"
+        },
+        "temperature": {
+          "type": "number",
+          "title": "Temperature",
+          "default": 0.2,
+          "minimum": 0,
+          "maximum": 2
+        }
+      }
+    }
+  }
+}

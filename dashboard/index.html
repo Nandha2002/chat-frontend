@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Template Dashboard</title>
+  <link rel="stylesheet" href="/dashboard/styles.css" />
+</head>
+<body>
+  <div class="bg-orb orb-a"></div>
+  <div class="bg-orb orb-b"></div>
+
+  <header class="topbar">
+    <div>
+      <p class="eyebrow">Template Ops</p>
+      <h1>Deploy From Templates</h1>
+    </div>
+    <div class="top-actions">
+      <button id="refreshTemplates" class="ghost-btn" type="button">Refresh Templates</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="panel templates-panel">
+      <div class="panel-head">
+        <h2>Templates</h2>
+      </div>
+      <div id="templateList" class="template-list"></div>
+
+      <div class="panel-head panel-head-sub">
+        <h2>Existing Chatbots</h2>
+      </div>
+      <div id="instanceList" class="instance-list"></div>
+    </section>
+
+    <section class="panel form-panel">
+      <div class="panel-head">
+        <h2 id="formTitle">Select a template</h2>
+      </div>
+      <form id="renderForm" class="render-form">
+        <div class="field-row">
+          <label for="outPath">Project name <span style="opacity:.6;font-weight:400">(used as output folder name)</span></label>
+          <input id="outPath" name="outPath" placeholder="my-chat-app" />
+        </div>
+        <div id="formFields" class="form-fields"></div>
+        <div class="actions">
+          <button id="renderBtn" type="submit" class="primary-btn" disabled>Render Template</button>
+        </div>
+      </form>
+      <pre id="status" class="status">Ready.</pre>
+    </section>
+  </main>
+
+  <script type="module" src="/dashboard/app.js"></script>
+</body>
+</html>

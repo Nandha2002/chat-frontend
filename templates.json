@@ -1,0 +1,18 @@
+[
+  {
+    "id": "Template_style1",
+    "name": "Template_style1",
+    "description": "React + Vite app with chat UI, predefined questions, and theme toggle.",
+    "templatePath": "./templates/Template_style1",
+    "defaultValuesPath": "./templates/Template_style1/values.json",
+    "schemaPath": "./templates/Template_style1/schema.json"
+  },
+  {
+    "id": "Template_style2",
+    "name": "Template_style2",
+    "description": "Minimal static landing page template with configurable branding and CTA.",
+    "templatePath": "./templates/Template_style2",
+    "defaultValuesPath": "./templates/Template_style2/values.json",
+    "schemaPath": "./templates/Template_style2/schema.json"
+  }
+]
