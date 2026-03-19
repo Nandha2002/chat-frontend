@@ -21,7 +21,7 @@ It includes:
 ## Project Structure
 
 ```text
-Frontend_Creator/
+chat-frontend/
   api-server.js                    # Dashboard + API server
   renderer.js                      # Handlebars renderer CLI
   templates.json                   # Template registry
