@@ -2,13 +2,17 @@
   "name": "frontend_creator",
   "version": "1.0.0",
   "description": "",
-  "main": "renderer.js",
+  "private": true,
   "type": "module",
+  "main": "renderer.js",
   "scripts": {
     "build": "node renderer.js",
-    "api": "node api-server.js",
     "start": "node api-server.js",
+    "api": "node api-server.js",
     "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "engines": {
+    "node": ">=18 <21"
   },
   "keywords": [],
   "author": "",
