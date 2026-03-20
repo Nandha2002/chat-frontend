@@ -4,9 +4,15 @@ import path from 'node:path'
 import { spawn } from 'node:child_process'
 import fs from 'fs-extra'
 
-const PORT = process.env.PORT ? Number(process.env.PORT) : 3001
-const HOST = '127.0.0.1'
-const ROOT = process.cwd()
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+
+
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+
 const REGISTRY_PATH = path.resolve(ROOT, 'templates.json')
 const DASHBOARD_ROOT = path.resolve(ROOT, 'dashboard')
 const OUTPUT_ROOT = path.resolve(ROOT, 'out')
@@ -657,6 +663,18 @@ const server = http.createServer(async (req, res) => {
   })
 })
 
+
+const PORT = Number(process.env.PORT) || 3001;
+// IMPORTANT: bind to all interfaces (Azure requirement)
+const HOST = '0.0.0.0';
+
+const server = http.createServer((req, res) => {
+  res.writeHead(200, { 'Content-Type': 'text/plain' });
+  res.end('Template API is running\n');
+});
+
 server.listen(PORT, HOST, () => {
-  console.log(`Template API listening on http://${HOST}:${PORT}`)
+  console.log(`Template API listening on http://${HOST}:${PORT}`);
+})
+
 })
