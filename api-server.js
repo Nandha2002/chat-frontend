@@ -333,9 +333,6 @@ async function serveFile(res, filePath) {
   return true
 }
 
-const server = http.createServer(async (req, res) => {
-  const method = req.method || 'GET'
-  const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`)
 
   if (method === 'OPTIONS') {
     res.writeHead(204, {
