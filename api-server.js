@@ -13,6 +13,7 @@ import { spawn } from 'node:child_process';
 import fs from 'fs-extra';
 import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';
+import { ensureContainer, uploadDirectory } from './blob-upload.js';
 
 // -------- Paths & globals --------
 const __filename = fileURLToPath(import.meta.url);
@@ -591,6 +592,28 @@ const server = http.createServer(async (req, res) => {
           buildLogs = launchInfo.buildLogs;
         }
 
+        // Publish a durable copy to Blob Storage (best effort).
+        // Prefer dist/ output when available; otherwise publish the raw outDir.
+        let publishDir = outDir;
+        const distDir = path.join(outDir, 'dist');
+        if (await fs.pathExists(path.join(distDir, 'index.html'))) {
+          publishDir = distDir;
+        }
+
+        let blobBaseUrl = null;
+        let durableUrl = null;
+        try {
+          const containerName = process.env.AZURE_STORAGE_CONTAINER || 'generated-sites';
+          const container = await ensureContainer(containerName);
+          const folderName = path.basename(outDir);
+          const prefix = `${templateId}/${folderName}`;
+
+          blobBaseUrl = await uploadDirectory(container, publishDir, prefix);
+          durableUrl = `${blobBaseUrl}index.html`;
+        } catch (e) {
+          console.error('Blob upload failed:', e?.message || e);
+        }
+
         sendJson(res, 200, {
           success: true,
           templateId,
@@ -599,6 +622,8 @@ const server = http.createServer(async (req, res) => {
           fallbackUsed,
           stdout: result.stdout.trim(),
           openUrl: launchUrl,
+          blobBaseUrl,
+          durableUrl,
           buildLogs: buildLogs.trim()
         });
       } catch (err) {

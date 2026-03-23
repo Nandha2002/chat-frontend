@@ -498,7 +498,7 @@ formEl.addEventListener('submit', async (event) => {
       setStatus('Render completed successfully.', JSON.stringify(data, null, 2))
     }
 
-    const targetUrl = data.openUrl || toOutputUrl(data.outDir)
+    const targetUrl = data.durableUrl || data.openUrl || toOutputUrl(data.outDir)
     if (targetUrl) {
       // Small delay gives status UI time to update before navigation.
       setTimeout(() => {

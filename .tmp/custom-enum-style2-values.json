@@ -1,0 +1,23 @@
+{
+    "acceptedFileTypes":  [
+                              ".pdf"
+                          ],
+    "pageTitle":  "Demo",
+    "ragConfig":  {
+                      "searchMethod":  "my-custom-search",
+                      "llmChoice":  "my-custom-llm",
+                      "chunkSize":  800,
+                      "temperature":  0.4,
+                      "systemPrompt":  "Use context",
+                      "embeddingModel":  "my-custom-embed-model"
+                  },
+    "headline":  "Head",
+    "chatbotName":  "Bot",
+    "uploadHint":  "Hint",
+    "uploadLabel":  "Upload",
+    "primaryColor":  "#ff8c00",
+    "secondaryColor":  "#6ea8ff",
+    "welcomePrompts":  [
+                           "One"
+                       ]
+}

@@ -141,12 +141,38 @@ const tplMeta = naiveYamlParse(yamlText)
 
 const values = JSON.parse(await fs.readFile(valuesPath, 'utf8'))
 
+// Removes enum constraints when schema marks a field as x-allowCustom.
+// This keeps strict validation for all other fields, while allowing custom
+// values for dashboard datalist-backed inputs.
+function normalizeSchemaForCustomEnums(schemaNode) {
+  if (!schemaNode || typeof schemaNode !== 'object') return schemaNode
+
+  if (Array.isArray(schemaNode)) {
+    return schemaNode.map((item) => normalizeSchemaForCustomEnums(item))
+  }
+
+  const clone = { ...schemaNode }
+  if (clone['x-allowCustom'] === true && Array.isArray(clone.enum)) {
+    delete clone.enum
+  }
+
+  for (const key of Object.keys(clone)) {
+    const child = clone[key]
+    if (child && typeof child === 'object') {
+      clone[key] = normalizeSchemaForCustomEnums(child)
+    }
+  }
+
+  return clone
+}
+
 // -------------------------------
 // Validate against schema.json (if present)
 // -------------------------------
 const schemaPath = path.join(templateDir, tplMeta.schema || 'schema.json')
 if (await fs.pathExists(schemaPath)) {
-  const schema = JSON.parse(await fs.readFile(schemaPath, 'utf8'))
+  const rawSchema = JSON.parse(await fs.readFile(schemaPath, 'utf8'))
+  const schema = normalizeSchemaForCustomEnums(rawSchema)
   // Allow template-specific schema extension keywords (for example x-allowCustom).
   const ajv = new Ajv({ allErrors: true, allowUnionTypes: true, strictSchema: false })
   const validate = ajv.compile(schema)
