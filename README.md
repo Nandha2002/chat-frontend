@@ -128,6 +128,23 @@ Request body:
 }
 ```
 
+### Instance blob sync
+- `POST /instances/:name/sync` — Manually trigger a sync of instance files from blob storage to local `out/` folder.
+
+Example: `POST /instances/my-chatbot/sync`
+
+Response:
+```json
+{
+  "success": true,
+  "message": "Instance synced from blob",
+  "synced": true,
+  "prefix": "Template_style2/my-chatbot/latest",
+  "container": "generated-sites",
+  "instance": { ... }
+}
+```
+
 ### Backend config capture
 - `POST /backend/render-config`
 - `GET /backend/render-config/latest`
@@ -189,6 +206,32 @@ Options:
 $env:PORT=3010
 npm run api
 ```
+
+### Blank page after render
+
+If the rendered web page appears blank:
+
+1. **Check if blob storage files are there:**
+   - Look in your Azure Storage container under `templates/<templateId>/<instanceName>/latest/`
+   - Verify files like `index.html`, `package.json`, `src/` are present
+
+2. **Manually sync from blob to local:**
+   ```bash
+   curl -X POST http://localhost:3001/instances/<instanceName>/sync
+   ```
+   Or access via dashboard → Edit → Sync from Blob
+
+3. **Verify the open URL:**
+   - Check the render response for `openUrl` — should point to `/outputs/<instanceName>/` or `/outputs/<instanceName>/dist/`
+   - If it's blank in response, check that `npm run build` completed successfully in the buildLogs
+
+4. **Rebuild the instance:**
+   - If files are now in local `out/<instanceName>/`, the build may have been skipped
+   - Delete `out/<instanceName>/node_modules` and `out/<instanceName>/dist`, then re-render
+
+5. **Check environment:**
+   - Ensure `AZURE_STORAGE_CONNECTION_STRING` is set for blob sync to work
+   - If blob operations fail, sync won't happen and you'll see defaults
 
 ### Render fails after Configure + change + Render
 This is usually a same-folder lock issue on Windows. The fallback retry logic now handles this automatically.

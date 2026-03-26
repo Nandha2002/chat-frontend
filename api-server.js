@@ -504,6 +504,41 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    const instanceSyncMatch = url.pathname.match(/^\/instances\/([^/]+)\/sync$/);
+    if (method === 'POST' && instanceSyncMatch) {
+      try {
+        const name = decodeURIComponent(instanceSyncMatch[1]);
+        let instance = await getInstance(name);
+        if (!instance) {
+          sendJson(res, 404, { error: `Instance not found: ${name}` });
+          return;
+        }
+        if (!BLOB_SYNC_ENABLED) {
+          sendJson(res, 400, { error: 'Blob sync is disabled', enabled: false });
+          return;
+        }
+        const sync = await syncInstanceFromBlobIfEnabled(instance);
+        if (sync.synced) {
+          const refreshed = await getInstance(name);
+          sendJson(res, 200, {
+            success: true,
+            message: 'Instance synced from blob',
+            ...sync,
+            instance: refreshed || instance
+          });
+        } else {
+          sendJson(res, 404, {
+            success: false,
+            message: 'No blob content found for this instance',
+            ...sync
+          });
+        }
+      } catch (err) {
+        sendJson(res, 500, { error: 'Failed to sync instance from blob', details: err instanceof Error ? err.message : String(err) });
+      }
+      return;
+    }
+
     // ---- Template schema ----
     const schemaMatch = url.pathname.match(/^\/templates\/([^/]+)\/schema$/);
     if (method === 'GET' && schemaMatch) {
@@ -684,6 +719,7 @@ const server = http.createServer(async (req, res) => {
         'GET /templates/:id/schema',
         'GET /instances',
         'GET /instances/:name',
+        'POST /instances/:name/sync',
         'GET /outputs/*',
         'POST /render',
         'POST /backend/render-config',
