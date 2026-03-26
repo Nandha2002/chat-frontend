@@ -664,9 +664,14 @@ const server = http.createServer(async (req, res) => {
           buildLogs = launchInfo.buildLogs;
         }
 
-        // Publish the full rendered project to Blob Storage (best effort).
-        // Use a stable 'latest' prefix so direct edits in blob can be synced back.
-        const publishDir = outDir;
+        // Publish the built output to Blob Storage (best effort).
+        // Prefer dist/ (compiled output) if available; otherwise upload raw source.
+        // Use a stable 'latest' prefix so direct blob access works.
+        let publishDir = outDir;
+        const distDir = path.join(outDir, 'dist');
+        if (await fs.pathExists(path.join(distDir, 'index.html'))) {
+          publishDir = distDir;
+        }
 
         let blobBaseUrl = null;
         let durableUrl = null;
