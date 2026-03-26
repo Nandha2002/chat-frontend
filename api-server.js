@@ -664,14 +664,11 @@ const server = http.createServer(async (req, res) => {
           buildLogs = launchInfo.buildLogs;
         }
 
-        // Publish the built output to Blob Storage (best effort).
-        // Prefer dist/ (compiled output) if available; otherwise upload raw source.
-        // Use a stable 'latest' prefix so direct blob access works.
-        let publishDir = outDir;
+        // Publish to Blob Storage (best effort).
+        // 1) Upload full source tree so users can edit all project files in blob.
+        // 2) If dist exists, overlay it so index.html is runnable from blob URL.
         const distDir = path.join(outDir, 'dist');
-        if (await fs.pathExists(path.join(distDir, 'index.html'))) {
-          publishDir = distDir;
-        }
+        const hasDist = await fs.pathExists(path.join(distDir, 'index.html'));
 
         let blobBaseUrl = null;
         let durableUrl = null;
@@ -681,7 +678,10 @@ const server = http.createServer(async (req, res) => {
           const folderName = path.basename(outDir);
           blobPrefix = getStableBlobPrefix(templateId, folderName);
 
-          blobBaseUrl = await uploadDirectory(container, publishDir, blobPrefix);
+          blobBaseUrl = await uploadDirectory(container, outDir, blobPrefix);
+          if (hasDist) {
+            await uploadDirectory(container, distDir, blobPrefix);
+          }
           durableUrl = `${blobBaseUrl}index.html`;
         } catch (e) {
           console.error('Blob upload failed:', e?.message || e);

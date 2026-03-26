@@ -241,11 +241,16 @@ Make sure you restarted the API after pulling latest changes.
 
 ## Blob-backed Template Runtime
 
-After each successful `POST /render`, the server uploads the full rendered project to blob storage using a stable prefix:
+After each successful `POST /render`, the server uploads to blob storage using a stable prefix:
 
 - `<templateId>/<instanceName>/latest/`
 
-This makes it possible to directly edit files in blob storage and have those edits reflected when instances are loaded.
+Upload behavior:
+
+- Full rendered source project is uploaded first (includes files like `src/`, `components/`, `package.json`, etc.).
+- If `dist/` exists, built files are uploaded over the same prefix so `index.html` is directly runnable from blob URL.
+
+This makes it possible to directly edit source files in blob storage and have those edits reflected when instances are loaded.
 
 ### Environment variables
 
