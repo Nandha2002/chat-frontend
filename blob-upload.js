@@ -51,8 +51,9 @@ export async function downloadPrefixToDirectory(containerClient, prefix, localDi
   const normalizedPrefix = prefix.replace(/^\/+|\/+$/g, '');
   const listPrefix = `${normalizedPrefix}/`;
 
-  await fs.remove(localDir);
-  await fs.ensureDir(localDir);
+  const tempDir = `${localDir}.sync-${Date.now()}`;
+  await fs.remove(tempDir);
+  await fs.ensureDir(tempDir);
 
   let foundAny = false;
   for await (const blob of containerClient.listBlobsFlat({ prefix: listPrefix })) {
@@ -60,11 +61,19 @@ export async function downloadPrefixToDirectory(containerClient, prefix, localDi
     const rel = blob.name.slice(listPrefix.length);
     if (!rel || rel.endsWith('/')) continue;
 
-    const destPath = path.join(localDir, rel);
+    const destPath = path.join(tempDir, rel);
     await fs.ensureDir(path.dirname(destPath));
     const client = containerClient.getBlobClient(blob.name);
     await client.downloadToFile(destPath);
   }
+
+  if (!foundAny) {
+    await fs.remove(tempDir);
+    return { foundAny, localDir, prefix: normalizedPrefix };
+  }
+
+  await fs.remove(localDir);
+  await fs.move(tempDir, localDir, { overwrite: true });
 
   return { foundAny, localDir, prefix: normalizedPrefix };
 }

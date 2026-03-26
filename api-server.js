@@ -33,8 +33,10 @@ const BACKEND_CONFIG_HISTORY_DIR = path.resolve(ROOT, '.tmp', 'backend-render-co
 const BACKEND_CONFIG_FORWARD_URL = process.env.BACKEND_CONFIG_FORWARD_URL || '';
 const BLOB_SYNC_ENABLED = String(process.env.ENABLE_BLOB_SYNC || 'true').toLowerCase() !== 'false';
 const BLOB_CONTAINER_NAME = process.env.AZURE_STORAGE_CONTAINER || 'generated-sites';
+const BLOB_SYNC_MIN_INTERVAL_MS = Number(process.env.BLOB_SYNC_MIN_INTERVAL_MS || 15000);
 
 let latestBackendConfig = null;
+const lastInstanceSyncAt = new Map();
 
 // -------- Helpers --------
 function sendJson(res, statusCode, payload) {
@@ -318,6 +320,28 @@ async function syncInstanceFromBlobIfEnabled(instance) {
   };
 }
 
+async function maybeSyncAndBuildInstance(instanceName, force = false) {
+  const name = path.basename(instanceName || '');
+  if (!name) return { synced: false, reason: 'invalid-instance-name' };
+
+  const now = Date.now();
+  const last = lastInstanceSyncAt.get(name) || 0;
+  if (!force && now - last < BLOB_SYNC_MIN_INTERVAL_MS) {
+    return { synced: false, reason: 'throttled' };
+  }
+
+  const instance = await getInstance(name);
+  if (!instance) return { synced: false, reason: 'instance-not-found' };
+
+  const sync = await syncInstanceFromBlobIfEnabled(instance);
+  if (sync.synced) {
+    await prepareLaunchableOutput(instance.outDir).catch(() => ({ launchUrl: null, buildLogs: '' }));
+    lastInstanceSyncAt.set(name, now);
+  }
+
+  return sync;
+}
+
 function getMimeType(filePath) {
   if (filePath.endsWith('.html')) return 'text/html; charset=utf-8';
   if (filePath.endsWith('.css')) return 'text/css; charset=utf-8';
@@ -431,6 +455,13 @@ const server = http.createServer(async (req, res) => {
       const normalized = path.normalize(rel);
       const requestedPath = path.resolve(OUTPUT_ROOT, normalized);
 
+      if (BLOB_SYNC_ENABLED) {
+        const firstSegment = normalized.split(/[\\/]/).filter(Boolean)[0];
+        if (firstSegment) {
+          await maybeSyncAndBuildInstance(firstSegment, false).catch(() => null);
+        }
+      }
+
       if (!requestedPath.startsWith(OUTPUT_ROOT)) {
         sendJson(res, 400, { error: 'Invalid outputs path' });
         return;
@@ -469,14 +500,6 @@ const server = http.createServer(async (req, res) => {
     if (method === 'GET' && url.pathname === '/instances') {
       try {
         const instances = await listInstances();
-        if (BLOB_SYNC_ENABLED) {
-          for (let i = 0; i < instances.length; i += 1) {
-            const sync = await syncInstanceFromBlobIfEnabled(instances[i]);
-            if (sync.synced && sync.instance) {
-              instances[i] = sync.instance;
-            }
-          }
-        }
         sendJson(res, 200, { instances });
       } catch (err) {
         sendJson(res, 500, { error: 'Failed to load instances', details: err instanceof Error ? err.message : String(err) });
@@ -493,9 +516,11 @@ const server = http.createServer(async (req, res) => {
           sendJson(res, 404, { error: `Instance not found: ${name}` });
           return;
         }
-        const sync = await syncInstanceFromBlobIfEnabled(instance);
+        const sync = await maybeSyncAndBuildInstance(name, true);
         if (sync.synced && sync.instance) {
           instance = sync.instance;
+        } else {
+          instance = await getInstance(name);
         }
         sendJson(res, 200, { instance });
       } catch (err) {
@@ -517,7 +542,7 @@ const server = http.createServer(async (req, res) => {
           sendJson(res, 400, { error: 'Blob sync is disabled', enabled: false });
           return;
         }
-        const sync = await syncInstanceFromBlobIfEnabled(instance);
+        const sync = await maybeSyncAndBuildInstance(name, true);
         if (sync.synced) {
           const refreshed = await getInstance(name);
           sendJson(res, 200, {
