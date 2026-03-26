@@ -16,6 +16,8 @@ It includes:
 - Backend payload capture on render (template + configuration + render options)
 - Backend payload history files (timestamped)
 - Optional forwarding of backend payload to another API endpoint
+- Full rendered project upload to Azure Blob Storage under a stable instance prefix
+- Optional auto-sync from Blob to local out/ folders so direct blob edits are reflected in running instances
 - Same-folder re-render fallback on Windows lock issues
 
 ## Project Structure
@@ -193,6 +195,28 @@ This is usually a same-folder lock issue on Windows. The fallback retry logic no
 
 ### Backend payload endpoint returns 404
 Make sure you restarted the API after pulling latest changes.
+
+## Blob-backed Template Runtime
+
+After each successful `POST /render`, the server uploads the full rendered project to blob storage using a stable prefix:
+
+- `<templateId>/<instanceName>/latest/`
+
+This makes it possible to directly edit files in blob storage and have those edits reflected when instances are loaded.
+
+### Environment variables
+
+- `AZURE_STORAGE_CONNECTION_STRING` (required for upload/sync)
+- `AZURE_STORAGE_CONTAINER` (optional, default: `generated-sites`)
+- `ENABLE_BLOB_SYNC` (optional, default: `true`)
+
+### Sync behavior
+
+- On `GET /instances` and `GET /instances/:name`, if blob sync is enabled:
+  - Server attempts to download latest files from blob prefix to local `out/<instanceName>`.
+  - If blob has newer/edited files, local instance content is refreshed.
+
+If blob storage is unavailable, existing local instance files continue to work.
 
 ## Notes
 

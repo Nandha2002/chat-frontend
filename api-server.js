@@ -13,7 +13,7 @@ import { spawn } from 'node:child_process';
 import fs from 'fs-extra';
 import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';
-import { ensureContainer, uploadDirectory } from './blob-upload.js';
+import { ensureContainer, uploadDirectory, downloadPrefixToDirectory } from './blob-upload.js';
 
 // -------- Paths & globals --------
 const __filename = fileURLToPath(import.meta.url);
@@ -31,6 +31,8 @@ const INSTANCE_META_FILE = '.template-instance.json';
 const BACKEND_CONFIG_FILE = path.resolve(ROOT, '.tmp', 'latest-backend-render-config.json');
 const BACKEND_CONFIG_HISTORY_DIR = path.resolve(ROOT, '.tmp', 'backend-render-config-history');
 const BACKEND_CONFIG_FORWARD_URL = process.env.BACKEND_CONFIG_FORWARD_URL || '';
+const BLOB_SYNC_ENABLED = String(process.env.ENABLE_BLOB_SYNC || 'true').toLowerCase() !== 'false';
+const BLOB_CONTAINER_NAME = process.env.AZURE_STORAGE_CONTAINER || 'generated-sites';
 
 let latestBackendConfig = null;
 
@@ -293,6 +295,29 @@ async function getInstance(name) {
   };
 }
 
+function getStableBlobPrefix(templateId, instanceName) {
+  return `${templateId}/${instanceName}/latest`;
+}
+
+async function syncInstanceFromBlobIfEnabled(instance) {
+  if (!BLOB_SYNC_ENABLED || !instance || !instance.templateId) return { synced: false, reason: 'disabled-or-missing-template' };
+
+  const container = await ensureContainer(BLOB_CONTAINER_NAME);
+  const prefix = getStableBlobPrefix(instance.templateId, instance.name);
+  const result = await downloadPrefixToDirectory(container, prefix, instance.outDir);
+  if (!result.foundAny) {
+    return { synced: false, reason: 'no-blob-content', prefix, container: BLOB_CONTAINER_NAME };
+  }
+
+  const refreshed = await getInstance(instance.name);
+  return {
+    synced: true,
+    prefix,
+    container: BLOB_CONTAINER_NAME,
+    instance: refreshed || instance
+  };
+}
+
 function getMimeType(filePath) {
   if (filePath.endsWith('.html')) return 'text/html; charset=utf-8';
   if (filePath.endsWith('.css')) return 'text/css; charset=utf-8';
@@ -444,6 +469,14 @@ const server = http.createServer(async (req, res) => {
     if (method === 'GET' && url.pathname === '/instances') {
       try {
         const instances = await listInstances();
+        if (BLOB_SYNC_ENABLED) {
+          for (let i = 0; i < instances.length; i += 1) {
+            const sync = await syncInstanceFromBlobIfEnabled(instances[i]);
+            if (sync.synced && sync.instance) {
+              instances[i] = sync.instance;
+            }
+          }
+        }
         sendJson(res, 200, { instances });
       } catch (err) {
         sendJson(res, 500, { error: 'Failed to load instances', details: err instanceof Error ? err.message : String(err) });
@@ -455,10 +488,14 @@ const server = http.createServer(async (req, res) => {
     if (method === 'GET' && instanceMatch) {
       try {
         const name = decodeURIComponent(instanceMatch[1]);
-        const instance = await getInstance(name);
+        let instance = await getInstance(name);
         if (!instance) {
           sendJson(res, 404, { error: `Instance not found: ${name}` });
           return;
+        }
+        const sync = await syncInstanceFromBlobIfEnabled(instance);
+        if (sync.synced && sync.instance) {
+          instance = sync.instance;
         }
         sendJson(res, 200, { instance });
       } catch (err) {
@@ -592,23 +629,19 @@ const server = http.createServer(async (req, res) => {
           buildLogs = launchInfo.buildLogs;
         }
 
-        // Publish a durable copy to Blob Storage (best effort).
-        // Prefer dist/ output when available; otherwise publish the raw outDir.
-        let publishDir = outDir;
-        const distDir = path.join(outDir, 'dist');
-        if (await fs.pathExists(path.join(distDir, 'index.html'))) {
-          publishDir = distDir;
-        }
+        // Publish the full rendered project to Blob Storage (best effort).
+        // Use a stable 'latest' prefix so direct edits in blob can be synced back.
+        const publishDir = outDir;
 
         let blobBaseUrl = null;
         let durableUrl = null;
+        let blobPrefix = null;
         try {
-          const containerName = process.env.AZURE_STORAGE_CONTAINER || 'generated-sites';
-          const container = await ensureContainer(containerName);
+          const container = await ensureContainer(BLOB_CONTAINER_NAME);
           const folderName = path.basename(outDir);
-          const prefix = `${templateId}/${folderName}`;
+          blobPrefix = getStableBlobPrefix(templateId, folderName);
 
-          blobBaseUrl = await uploadDirectory(container, publishDir, prefix);
+          blobBaseUrl = await uploadDirectory(container, publishDir, blobPrefix);
           durableUrl = `${blobBaseUrl}index.html`;
         } catch (e) {
           console.error('Blob upload failed:', e?.message || e);
@@ -622,6 +655,9 @@ const server = http.createServer(async (req, res) => {
           fallbackUsed,
           stdout: result.stdout.trim(),
           openUrl: launchUrl,
+          blobSyncEnabled: BLOB_SYNC_ENABLED,
+          blobContainer: BLOB_CONTAINER_NAME,
+          blobPrefix,
           blobBaseUrl,
           durableUrl,
           buildLogs: buildLogs.trim()

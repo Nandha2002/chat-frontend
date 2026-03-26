@@ -42,3 +42,29 @@ async function walkAndUpload(containerClient, dir, prefix) {
     }
   }
 }
+
+export async function downloadPrefixToDirectory(containerClient, prefix, localDir) {
+  if (!prefix || typeof prefix !== 'string') {
+    throw new Error('downloadPrefixToDirectory: prefix is required');
+  }
+
+  const normalizedPrefix = prefix.replace(/^\/+|\/+$/g, '');
+  const listPrefix = `${normalizedPrefix}/`;
+
+  await fs.remove(localDir);
+  await fs.ensureDir(localDir);
+
+  let foundAny = false;
+  for await (const blob of containerClient.listBlobsFlat({ prefix: listPrefix })) {
+    foundAny = true;
+    const rel = blob.name.slice(listPrefix.length);
+    if (!rel || rel.endsWith('/')) continue;
+
+    const destPath = path.join(localDir, rel);
+    await fs.ensureDir(path.dirname(destPath));
+    const client = containerClient.getBlobClient(blob.name);
+    await client.downloadToFile(destPath);
+  }
+
+  return { foundAny, localDir, prefix: normalizedPrefix };
+}
