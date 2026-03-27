@@ -130,8 +130,11 @@ Request body:
 
 ### Instance blob sync
 - `POST /instances/:name/sync` — Manually trigger a sync of instance files from blob storage to local `out/` folder.
+- `POST /instances/:name/rebuild-and-publish` — Sync source from blob, rebuild the app, and republish runnable files back to blob.
 
 Example: `POST /instances/my-chatbot/sync`
+
+Example: `POST /instances/my-chatbot/rebuild-and-publish`
 
 Response:
 ```json

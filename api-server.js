@@ -344,6 +344,24 @@ async function maybeSyncAndBuildInstance(instanceName, force = false) {
   return sync;
 }
 
+async function publishInstanceToBlob(templateId, instanceName, outDir) {
+  const distDir = path.join(outDir, 'dist');
+  const hasDist = await fs.pathExists(path.join(distDir, 'index.html'));
+
+  const container = await ensureContainer(BLOB_CONTAINER_NAME);
+  const blobPrefix = getStableBlobPrefix(templateId, instanceName);
+  const blobBaseUrl = await uploadDirectory(container, outDir, blobPrefix);
+  if (hasDist) {
+    await uploadDirectory(container, distDir, blobPrefix);
+  }
+
+  return {
+    blobPrefix,
+    blobBaseUrl,
+    durableUrl: `${blobBaseUrl}index.html`
+  };
+}
+
 function getMimeType(filePath) {
   if (filePath.endsWith('.html')) return 'text/html; charset=utf-8';
   if (filePath.endsWith('.css')) return 'text/css; charset=utf-8';
@@ -568,6 +586,49 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    const instanceRebuildMatch = url.pathname.match(/^\/instances\/([^/]+)\/rebuild-and-publish$/);
+    if (method === 'POST' && instanceRebuildMatch) {
+      try {
+        const name = decodeURIComponent(instanceRebuildMatch[1]);
+        let instance = await getInstance(name);
+        if (!instance) {
+          sendJson(res, 404, { error: `Instance not found: ${name}` });
+          return;
+        }
+        if (!instance.templateId) {
+          sendJson(res, 400, { error: 'Instance is missing templateId in metadata' });
+          return;
+        }
+
+        // Pull latest source edits from blob first (if available), then rebuild and republish.
+        await maybeSyncAndBuildInstance(name, true);
+        instance = await getInstance(name);
+        if (!instance) {
+          sendJson(res, 404, { error: `Instance not found after sync: ${name}` });
+          return;
+        }
+
+        const distDir = path.join(instance.outDir, 'dist');
+        await fs.remove(distDir).catch(() => null);
+        const launchInfo = await prepareLaunchableOutput(instance.outDir);
+
+        const published = await publishInstanceToBlob(instance.templateId, instance.name, instance.outDir);
+        sendJson(res, 200, {
+          success: true,
+          message: 'Instance rebuilt from source and republished to blob',
+          instance: await getInstance(name),
+          openUrl: launchInfo.launchUrl,
+          buildLogs: launchInfo.buildLogs.trim(),
+          blobSyncEnabled: BLOB_SYNC_ENABLED,
+          blobContainer: BLOB_CONTAINER_NAME,
+          ...published
+        });
+      } catch (err) {
+        sendJson(res, 500, { error: 'Failed to rebuild and publish instance', details: err instanceof Error ? err.message : String(err) });
+      }
+      return;
+    }
+
     // ---- Template schema ----
     const schemaMatch = url.pathname.match(/^\/templates\/([^/]+)\/schema$/);
     if (method === 'GET' && schemaMatch) {
@@ -696,22 +757,15 @@ const server = http.createServer(async (req, res) => {
         // Publish to Blob Storage (best effort).
         // 1) Upload full source tree so users can edit all project files in blob.
         // 2) If dist exists, overlay it so index.html is runnable from blob URL.
-        const distDir = path.join(outDir, 'dist');
-        const hasDist = await fs.pathExists(path.join(distDir, 'index.html'));
-
         let blobBaseUrl = null;
         let durableUrl = null;
         let blobPrefix = null;
         try {
-          const container = await ensureContainer(BLOB_CONTAINER_NAME);
           const folderName = path.basename(outDir);
-          blobPrefix = getStableBlobPrefix(templateId, folderName);
-
-          blobBaseUrl = await uploadDirectory(container, outDir, blobPrefix);
-          if (hasDist) {
-            await uploadDirectory(container, distDir, blobPrefix);
-          }
-          durableUrl = `${blobBaseUrl}index.html`;
+          const published = await publishInstanceToBlob(templateId, folderName, outDir);
+          blobPrefix = published.blobPrefix;
+          blobBaseUrl = published.blobBaseUrl;
+          durableUrl = published.durableUrl;
         } catch (e) {
           console.error('Blob upload failed:', e?.message || e);
         }
@@ -754,6 +808,7 @@ const server = http.createServer(async (req, res) => {
         'GET /instances',
         'GET /instances/:name',
         'POST /instances/:name/sync',
+        'POST /instances/:name/rebuild-and-publish',
         'GET /outputs/*',
         'POST /render',
         'POST /backend/render-config',
