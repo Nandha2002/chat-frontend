@@ -33,7 +33,7 @@ const BACKEND_CONFIG_HISTORY_DIR = path.resolve(ROOT, '.tmp', 'backend-render-co
 const BACKEND_CONFIG_FORWARD_URL = process.env.BACKEND_CONFIG_FORWARD_URL || '';
 const BLOB_SYNC_ENABLED = String(process.env.ENABLE_BLOB_SYNC || 'true').toLowerCase() !== 'false';
 const BLOB_CONTAINER_NAME = process.env.AZURE_STORAGE_CONTAINER || 'generated-sites';
-const BLOB_SYNC_MIN_INTERVAL_MS = Number(process.env.BLOB_SYNC_MIN_INTERVAL_MS || 15000);
+const BLOB_SYNC_MIN_INTERVAL_MS = Number(process.env.BLOB_SYNC_MIN_INTERVAL_MS || 3000);
 
 let latestBackendConfig = null;
 const lastInstanceSyncAt = new Map();
@@ -335,6 +335,8 @@ async function maybeSyncAndBuildInstance(instanceName, force = false) {
 
   const sync = await syncInstanceFromBlobIfEnabled(instance);
   if (sync.synced) {
+    const distDir = path.join(instance.outDir, 'dist');
+    await fs.remove(distDir).catch(() => null);
     await prepareLaunchableOutput(instance.outDir).catch(() => ({ launchUrl: null, buildLogs: '' }));
     lastInstanceSyncAt.set(name, now);
   }
@@ -359,7 +361,9 @@ async function serveFile(res, filePath) {
   const content = await fs.readFile(filePath);
   res.writeHead(200, {
     'Content-Type': getMimeType(filePath),
-    'Cache-Control': 'no-store',
+    'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
+    'Pragma': 'no-cache',
+    'Expires': '0',
     'Access-Control-Allow-Origin': '*'
   });
   res.end(content);
