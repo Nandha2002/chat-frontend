@@ -38,7 +38,12 @@ async function walkAndUpload(containerClient, dir, prefix) {
     } else {
       const contentType = mime.lookup(abs) || 'application/octet-stream';
       const bb = containerClient.getBlockBlobClient(blobPath);
-      await bb.uploadFile(abs, { blobHTTPHeaders: { blobContentType: contentType } });
+      await bb.uploadFile(abs, {
+        blobHTTPHeaders: {
+          blobContentType: contentType,
+          blobCacheControl: 'no-store, no-cache, must-revalidate, max-age=0'
+        }
+      });
     }
   }
 }

@@ -352,7 +352,26 @@ async function publishInstanceToBlob(templateId, instanceName, outDir) {
   const blobPrefix = getStableBlobPrefix(templateId, instanceName);
   const blobBaseUrl = await uploadDirectory(container, outDir, blobPrefix);
   if (hasDist) {
-    await uploadDirectory(container, distDir, blobPrefix);
+    const tempDistDir = path.join(ROOT, '.tmp', `publish-dist-${instanceName}-${Date.now()}`);
+    await fs.remove(tempDistDir).catch(() => null);
+    await fs.copy(distDir, tempDistDir);
+
+    const distIndexPath = path.join(tempDistDir, 'index.html');
+    if (await fs.pathExists(distIndexPath)) {
+      let html = await fs.readFile(distIndexPath, 'utf8');
+      if (!html.includes('data-source-style-bridge="true"')) {
+        const bridgeTag = '<link rel="stylesheet" href="./src/styles.css" data-source-style-bridge="true">';
+        if (html.includes('</head>')) {
+          html = html.replace('</head>', `  ${bridgeTag}\n</head>`);
+        } else {
+          html = `${html}\n${bridgeTag}\n`;
+        }
+        await fs.writeFile(distIndexPath, html, 'utf8');
+      }
+    }
+
+    await uploadDirectory(container, tempDistDir, blobPrefix);
+    await fs.remove(tempDistDir).catch(() => null);
   }
 
   return {
