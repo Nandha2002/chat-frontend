@@ -253,6 +253,18 @@ async function fetchInstance(instanceName) {
   return res.json()
 }
 
+// Syncs latest blob source, rebuilds, and republishes runnable output for an instance.
+async function rebuildAndPublishInstance(instanceName) {
+  const res = await fetch(`/instances/${encodeURIComponent(instanceName)}/rebuild-and-publish`, {
+    method: 'POST'
+  })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok || !data.success) {
+    throw new Error(data.details || data.error || `Rebuild failed (${res.status})`)
+  }
+  return data
+}
+
 // Applies existing values back onto generated form fields (for reconfiguration flows).
 function applyValuesToForm(values) {
   if (!values || typeof values !== 'object') return
@@ -335,11 +347,23 @@ function renderInstanceCards() {
     const openBtn = document.createElement('button')
     openBtn.type = 'button'
     openBtn.className = 'mini-btn primary'
-    openBtn.textContent = 'Open'
-    openBtn.addEventListener('click', () => {
-      // Navigate to the generated output when an open URL is available.
-      if (instance.openUrl) {
-        window.location.assign(instance.openUrl)
+    openBtn.textContent = 'Live Open'
+    openBtn.addEventListener('click', async () => {
+      try {
+        openBtn.disabled = true
+        setStatus(`Rebuilding ${instance.name} from blob changes...`)
+        const data = await rebuildAndPublishInstance(instance.name)
+        setStatus('Rebuild completed successfully.', JSON.stringify(data, null, 2))
+        const targetUrl = data.durableUrl || data.openUrl || instance.openUrl
+        if (targetUrl) {
+          window.location.assign(targetUrl)
+          return
+        }
+        setStatus('Rebuild completed, but no launch URL was returned.')
+      } catch (err) {
+        setStatus('Live open failed.', err.message || String(err))
+      } finally {
+        openBtn.disabled = false
       }
     })
 
@@ -498,7 +522,7 @@ formEl.addEventListener('submit', async (event) => {
       setStatus('Render completed successfully.', JSON.stringify(data, null, 2))
     }
 
-    const targetUrl = data.durableUrl || data.openUrl || toOutputUrl(data.outDir)
+    const targetUrl = data.openUrl || data.durableUrl || toOutputUrl(data.outDir)
     if (targetUrl) {
       // Small delay gives status UI time to update before navigation.
       setTimeout(() => {
