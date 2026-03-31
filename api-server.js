@@ -72,6 +72,9 @@ const BLOB_SYNC_ENABLED = String(
 const CLEAN_INSTANCE_NODE_MODULES = String(
   process.env.CLEAN_INSTANCE_NODE_MODULES || (IS_AZURE_APP_SERVICE ? 'true' : 'false')
 ).toLowerCase() !== 'false';
+const FORCE_REBUILD_ON_OUTPUT_REFRESH = String(
+  process.env.FORCE_REBUILD_ON_OUTPUT_REFRESH || (IS_AZURE_APP_SERVICE ? 'true' : 'false')
+).toLowerCase() !== 'false';
 const BLOB_CONTAINER_NAME = process.env.AZURE_STORAGE_CONTAINER || 'generated-sites';
 const BLOB_SYNC_MIN_INTERVAL_MS = Number(process.env.BLOB_SYNC_MIN_INTERVAL_MS || 3000);
 
@@ -557,7 +560,7 @@ const server = http.createServer(async (req, res) => {
 
       if (BLOB_SYNC_ENABLED) {
         if (instanceName && shouldAutoSyncForOutputPath(parts)) {
-          await maybeSyncAndBuildInstance(instanceName, false).catch(() => null);
+          await maybeSyncAndBuildInstance(instanceName, FORCE_REBUILD_ON_OUTPUT_REFRESH).catch(() => null);
         }
       }
 
