@@ -3,6 +3,8 @@ import path from 'node:path';
 import fs from 'fs-extra';
 import mime from 'mime-types';
 
+const SKIP_DIRS = new Set(['node_modules', '.git', '.cache']);
+
 function getBlobServiceClient() {
   const conn = process.env.AZURE_STORAGE_CONNECTION_STRING;
   if (!conn) throw new Error('AZURE_STORAGE_CONNECTION_STRING is not set');
@@ -30,6 +32,10 @@ export async function uploadDirectory(containerClient, localDir, prefix) {
 async function walkAndUpload(containerClient, dir, prefix) {
   const entries = await fs.readdir(dir, { withFileTypes: true });
   for (const e of entries) {
+    if (e.isDirectory() && SKIP_DIRS.has(e.name)) {
+      continue;
+    }
+
     const abs = path.join(dir, e.name);
     const blobPath = prefix ? `${prefix}/${e.name}` : e.name;
 
@@ -65,6 +71,7 @@ export async function downloadPrefixToDirectory(containerClient, prefix, localDi
     foundAny = true;
     const rel = blob.name.slice(listPrefix.length);
     if (!rel || rel.endsWith('/')) continue;
+    if (rel.startsWith('node_modules/')) continue;
 
     const destPath = path.join(tempDir, rel);
     await fs.ensureDir(path.dirname(destPath));
@@ -77,8 +84,10 @@ export async function downloadPrefixToDirectory(containerClient, prefix, localDi
     return { foundAny, localDir, prefix: normalizedPrefix };
   }
 
-  await fs.remove(localDir);
-  await fs.move(tempDir, localDir, { overwrite: true });
+  // Merge synced source into existing instance directory so local node_modules can be reused.
+  await fs.ensureDir(localDir);
+  await fs.copy(tempDir, localDir, { overwrite: true });
+  await fs.remove(tempDir);
 
   return { foundAny, localDir, prefix: normalizedPrefix };
 }

@@ -182,6 +182,18 @@ function outputUrlFromPath(targetPath) {
   return `/outputs/${rel}/`;
 }
 
+function shouldAutoSyncForOutputPath(parts) {
+  if (!Array.isArray(parts) || parts.length === 0) return false;
+  if (parts.length === 1) return true; // /outputs/<instance>/
+
+  // /outputs/<instance>/dist/ should sync before serving dist/index.html
+  const second = String(parts[1] || '').toLowerCase();
+  if (parts.length === 2 && second === 'dist') return true;
+
+  const leaf = String(parts[parts.length - 1] || '').toLowerCase();
+  return leaf === 'index.html';
+}
+
 async function prepareLaunchableOutput(outDir) {
   let launchUrl = outputUrlFromPath(outDir);
   let buildLogs = '';
@@ -196,18 +208,28 @@ async function prepareLaunchableOutput(outDir) {
     return { launchUrl, buildLogs };
   }
 
-  const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+  const runNpm = async (npmArgs) => {
+    if (process.platform === 'win32') {
+      // Use cmd.exe directly to avoid spawn EINVAL with npm.cmd on some Windows setups.
+      return runCommand('cmd.exe', ['/d', '/s', '/c', `npm ${npmArgs.join(' ')}`], outDir);
+    }
+    return runCommand('npm', npmArgs, outDir);
+  };
+
   const nodeModulesPath = path.join(outDir, 'node_modules');
 
   if (!(await fs.pathExists(nodeModulesPath))) {
-    const install = await runCommand(npmCmd, ['install'], outDir);
+    const install = await runNpm(['install']);
     buildLogs += install.stdout + install.stderr;
     if (install.code !== 0) {
       throw new Error(`npm install failed for ${outDir}\n${install.stderr || install.stdout}`);
     }
   }
 
-  const build = await runCommand(npmCmd, ['run', 'build'], outDir);
+  // Clear Vite transform cache to avoid stale bundle output after blob-synced source edits.
+  await fs.remove(path.join(nodeModulesPath, '.vite')).catch(() => null);
+
+  const build = await runNpm(['run', 'build']);
   buildLogs += build.stdout + build.stderr;
   if (build.code !== 0) {
     throw new Error(`npm run build failed for ${outDir}\n${build.stderr || build.stdout}`);
@@ -529,7 +551,7 @@ const server = http.createServer(async (req, res) => {
       const requestedPath = path.resolve(OUTPUT_ROOT, normalized);
 
       if (BLOB_SYNC_ENABLED) {
-        if (instanceName) {
+        if (instanceName && shouldAutoSyncForOutputPath(parts)) {
           await maybeSyncAndBuildInstance(instanceName, false).catch(() => null);
         }
       }
