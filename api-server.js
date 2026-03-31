@@ -22,6 +22,35 @@ const __dirname = dirname(__filename);
 // Root of the running app. Keep this as process.cwd() so it works both locally and in Azure.
 const ROOT = process.cwd();
 
+// Load .env automatically for local runs so `npm start` works without manual export commands.
+function loadDotEnvFile(envPath) {
+  if (!fs.existsSync(envPath)) return;
+
+  const raw = fs.readFileSync(envPath, 'utf8');
+  for (const line of raw.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+
+    const idx = trimmed.indexOf('=');
+    if (idx <= 0) continue;
+
+    const key = trimmed.slice(0, idx).trim();
+    let value = trimmed.slice(idx + 1);
+
+    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+      value = value.slice(1, -1);
+    }
+
+    if (!(key in process.env)) {
+      process.env[key] = value;
+    }
+  }
+}
+
+if (process.env.NODE_ENV !== 'production') {
+  loadDotEnvFile(path.resolve(ROOT, '.env'));
+}
+
 const REGISTRY_PATH = path.resolve(ROOT, 'templates.json');
 const DASHBOARD_ROOT = path.resolve(ROOT, 'dashboard');
 const OUTPUT_ROOT = path.resolve(ROOT, 'out');
@@ -167,19 +196,18 @@ async function prepareLaunchableOutput(outDir) {
     return { launchUrl, buildLogs };
   }
 
-  const npmCmd = 'npm';
-  const npmShell = process.platform === 'win32';
+  const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm';
   const nodeModulesPath = path.join(outDir, 'node_modules');
 
   if (!(await fs.pathExists(nodeModulesPath))) {
-    const install = await runCommand(npmCmd, ['install'], outDir, { shell: npmShell });
+    const install = await runCommand(npmCmd, ['install'], outDir);
     buildLogs += install.stdout + install.stderr;
     if (install.code !== 0) {
       throw new Error(`npm install failed for ${outDir}\n${install.stderr || install.stdout}`);
     }
   }
 
-  const build = await runCommand(npmCmd, ['run', 'build'], outDir, { shell: npmShell });
+  const build = await runCommand(npmCmd, ['run', 'build'], outDir);
   buildLogs += build.stdout + build.stderr;
   if (build.code !== 0) {
     throw new Error(`npm run build failed for ${outDir}\n${build.stderr || build.stdout}`);
@@ -335,9 +363,11 @@ async function maybeSyncAndBuildInstance(instanceName, force = false) {
 
   const sync = await syncInstanceFromBlobIfEnabled(instance);
   if (sync.synced) {
-    const distDir = path.join(instance.outDir, 'dist');
-    await fs.remove(distDir).catch(() => null);
-    await prepareLaunchableOutput(instance.outDir).catch(() => ({ launchUrl: null, buildLogs: '' }));
+    // Keep existing dist as fallback if rebuild fails.
+    await prepareLaunchableOutput(instance.outDir).catch((err) => {
+      console.error(`maybeSyncAndBuildInstance build failed for ${name}:`, err?.message || err);
+      return { launchUrl: null, buildLogs: '' };
+    });
     lastInstanceSyncAt.set(name, now);
   }
 
@@ -494,12 +524,13 @@ const server = http.createServer(async (req, res) => {
     if (method === 'GET' && url.pathname.startsWith('/outputs/')) {
       const rel = decodeURIComponent(url.pathname.slice('/outputs/'.length));
       const normalized = path.normalize(rel);
+      const parts = normalized.split(/[\\/]/).filter(Boolean);
+      const instanceName = parts[0] || '';
       const requestedPath = path.resolve(OUTPUT_ROOT, normalized);
 
       if (BLOB_SYNC_ENABLED) {
-        const firstSegment = normalized.split(/[\\/]/).filter(Boolean)[0];
-        if (firstSegment) {
-          await maybeSyncAndBuildInstance(firstSegment, false).catch(() => null);
+        if (instanceName) {
+          await maybeSyncAndBuildInstance(instanceName, false).catch(() => null);
         }
       }
 
@@ -511,6 +542,19 @@ const server = http.createServer(async (req, res) => {
       let targetFile = requestedPath;
       if ((await fs.pathExists(requestedPath)) && (await fs.stat(requestedPath)).isDirectory()) {
         targetFile = path.join(requestedPath, 'index.html');
+      }
+
+      // If /outputs/<instance>/dist/... is requested but dist is missing,
+      // fallback to root output path (where published runnable assets live).
+      if (!(await fs.pathExists(targetFile)) && parts.length >= 2 && parts[1] === 'dist' && instanceName) {
+        const fallbackParts = [instanceName, ...parts.slice(2)];
+        let fallbackPath = path.resolve(OUTPUT_ROOT, fallbackParts.join('/'));
+        if ((await fs.pathExists(fallbackPath)) && (await fs.stat(fallbackPath)).isDirectory()) {
+          fallbackPath = path.join(fallbackPath, 'index.html');
+        }
+        if (await fs.pathExists(fallbackPath)) {
+          targetFile = fallbackPath;
+        }
       }
 
       await serveFile(res, targetFile);
