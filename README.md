@@ -259,7 +259,10 @@ This makes it possible to directly edit source files in blob storage and have th
 
 - `AZURE_STORAGE_CONNECTION_STRING` (required for upload/sync)
 - `AZURE_STORAGE_CONTAINER` (optional, default: `generated-sites`)
-- `ENABLE_BLOB_SYNC` (optional, default: `true`)
+- `ENABLE_BLOB_SYNC` (optional, default: `true` when storage connection string is set; otherwise `false`)
+- `APP_DATA_ROOT` (optional, default: `/home/site/data` on Azure App Service; project root locally)
+- `OUTPUT_ROOT` (optional, overrides generated instance folder location)
+- `TMP_ROOT` (optional, overrides backend payload snapshot/history temp folder)
 
 ### Sync behavior
 

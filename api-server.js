@@ -13,7 +13,7 @@ import { spawn } from 'node:child_process';
 import fs from 'fs-extra';
 import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';
-import { ensureContainer, uploadDirectory, downloadPrefixToDirectory } from './blob-upload.js';
+import { ensureContainer, uploadDirectory, downloadPrefixToDirectory, deletePrefix } from './blob-upload.js';
 
 // -------- Paths & globals --------
 const __filename = fileURLToPath(import.meta.url);
@@ -21,6 +21,7 @@ const __dirname = dirname(__filename);
 
 // Root of the running app. Keep this as process.cwd() so it works both locally and in Azure.
 const ROOT = process.cwd();
+const IS_AZURE_APP_SERVICE = !!(process.env.WEBSITE_SITE_NAME || process.env.WEBSITE_INSTANCE_ID);
 
 // Load .env automatically for local runs so `npm start` works without manual export commands.
 function loadDotEnvFile(envPath) {
@@ -53,14 +54,21 @@ if (process.env.NODE_ENV !== 'production') {
 
 const REGISTRY_PATH = path.resolve(ROOT, 'templates.json');
 const DASHBOARD_ROOT = path.resolve(ROOT, 'dashboard');
-const OUTPUT_ROOT = path.resolve(ROOT, 'out');
+const DATA_ROOT = path.resolve(
+  process.env.APP_DATA_ROOT || (IS_AZURE_APP_SERVICE ? '/home/site/data' : ROOT)
+);
+const OUTPUT_ROOT = path.resolve(process.env.OUTPUT_ROOT || path.join(DATA_ROOT, 'out'));
+const TMP_ROOT = path.resolve(process.env.TMP_ROOT || path.join(DATA_ROOT, '.tmp'));
 
 const INSTANCE_META_FILE = '.template-instance.json';
 
-const BACKEND_CONFIG_FILE = path.resolve(ROOT, '.tmp', 'latest-backend-render-config.json');
-const BACKEND_CONFIG_HISTORY_DIR = path.resolve(ROOT, '.tmp', 'backend-render-config-history');
+const BACKEND_CONFIG_FILE = path.resolve(TMP_ROOT, 'latest-backend-render-config.json');
+const BACKEND_CONFIG_HISTORY_DIR = path.resolve(TMP_ROOT, 'backend-render-config-history');
 const BACKEND_CONFIG_FORWARD_URL = process.env.BACKEND_CONFIG_FORWARD_URL || '';
-const BLOB_SYNC_ENABLED = String(process.env.ENABLE_BLOB_SYNC || 'true').toLowerCase() !== 'false';
+const HAS_BLOB_CONNECTION = !!process.env.AZURE_STORAGE_CONNECTION_STRING;
+const BLOB_SYNC_ENABLED = String(
+  process.env.ENABLE_BLOB_SYNC || (HAS_BLOB_CONNECTION ? 'true' : 'false')
+).toLowerCase() !== 'false';
 const BLOB_CONTAINER_NAME = process.env.AZURE_STORAGE_CONTAINER || 'generated-sites';
 const BLOB_SYNC_MIN_INTERVAL_MS = Number(process.env.BLOB_SYNC_MIN_INTERVAL_MS || 3000);
 
@@ -197,6 +205,16 @@ function shouldAutoSyncForOutputPath(parts) {
 async function prepareLaunchableOutput(outDir) {
   let launchUrl = outputUrlFromPath(outDir);
   let buildLogs = '';
+
+  const indexPath = path.join(outDir, 'index.html');
+  if (await fs.pathExists(indexPath)) {
+    const html = await fs.readFile(indexPath, 'utf8');
+    if (html.includes('./assets/index-') || html.includes('/assets/index-')) {
+      // Recover source entrypoint if a previously published dist index replaced root index.html.
+      const normalized = `<!doctype html>\n<html lang="en">\n  <head>\n    <meta charset="UTF-8" />\n    <meta name="viewport" content="width=device-width, initial-scale=1.0" />\n    <title>Template App</title>\n  </head>\n  <body>\n    <div id="root"></div>\n    <script type="module" src="/src/main.jsx"></script>\n  </body>\n</html>\n`;
+      await fs.writeFile(indexPath, normalized, 'utf8');
+    }
+  }
 
   const packageJsonPath = path.join(outDir, 'package.json');
   if (!(await fs.pathExists(packageJsonPath))) {
@@ -402,34 +420,13 @@ async function publishInstanceToBlob(templateId, instanceName, outDir) {
 
   const container = await ensureContainer(BLOB_CONTAINER_NAME);
   const blobPrefix = getStableBlobPrefix(templateId, instanceName);
+  await deletePrefix(container, blobPrefix);
   const blobBaseUrl = await uploadDirectory(container, outDir, blobPrefix);
-  if (hasDist) {
-    const tempDistDir = path.join(ROOT, '.tmp', `publish-dist-${instanceName}-${Date.now()}`);
-    await fs.remove(tempDistDir).catch(() => null);
-    await fs.copy(distDir, tempDistDir);
-
-    const distIndexPath = path.join(tempDistDir, 'index.html');
-    if (await fs.pathExists(distIndexPath)) {
-      let html = await fs.readFile(distIndexPath, 'utf8');
-      if (!html.includes('data-source-style-bridge="true"')) {
-        const bridgeTag = '<link rel="stylesheet" href="./src/styles.css" data-source-style-bridge="true">';
-        if (html.includes('</head>')) {
-          html = html.replace('</head>', `  ${bridgeTag}\n</head>`);
-        } else {
-          html = `${html}\n${bridgeTag}\n`;
-        }
-        await fs.writeFile(distIndexPath, html, 'utf8');
-      }
-    }
-
-    await uploadDirectory(container, tempDistDir, blobPrefix);
-    await fs.remove(tempDistDir).catch(() => null);
-  }
 
   return {
     blobPrefix,
     blobBaseUrl,
-    durableUrl: `${blobBaseUrl}index.html`
+    durableUrl: hasDist ? `${blobBaseUrl}dist/index.html` : `${blobBaseUrl}index.html`
   };
 }
 
@@ -686,8 +683,12 @@ const server = http.createServer(async (req, res) => {
         }
 
         // Pull latest source edits from blob first (if available), then rebuild and republish.
-        await maybeSyncAndBuildInstance(name, true);
-        instance = await getInstance(name);
+        const sync = await syncInstanceFromBlobIfEnabled(instance);
+        if (sync.synced && sync.instance) {
+          instance = sync.instance;
+        } else {
+          instance = await getInstance(name);
+        }
         if (!instance) {
           sendJson(res, 404, { error: `Instance not found after sync: ${name}` });
           return;
@@ -909,4 +910,7 @@ const server = http.createServer(async (req, res) => {
 // Using only PORT defaults to 0.0.0.0 on Linux (App Service).
 server.listen(PORT, () => {
   console.log(`Template API listening on port ${PORT}`);
+  console.log(`Data root: ${DATA_ROOT}`);
+  console.log(`Output root: ${OUTPUT_ROOT}`);
+  console.log(`Blob sync enabled: ${BLOB_SYNC_ENABLED}`);
 });

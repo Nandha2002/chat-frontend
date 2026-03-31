@@ -24,9 +24,22 @@ jobs:
 
       # ✅ No build step — Node API app
 
+      - name: Prepare deployment package
+        run: |
+          mkdir -p deploy
+          rsync -av --delete \
+            --exclude '.git' \
+            --exclude '.github' \
+            --exclude 'node_modules' \
+            --exclude 'out' \
+            --exclude '.tmp' \
+            --exclude '.env' \
+            --exclude '*.log' \
+            ./ deploy/
+
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
         with:
           app-name: NandhaTemp
           publish-profile: ${{ secrets.AZURE_PUBLISH_PROFILE }}
-          package: .
+          package: ./deploy

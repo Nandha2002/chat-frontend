@@ -29,6 +29,19 @@ export async function uploadDirectory(containerClient, localDir, prefix) {
   return `${containerClient.url}/${encodeURI(prefix)}/`;
 }
 
+export async function deletePrefix(containerClient, prefix) {
+  if (!prefix || typeof prefix !== 'string') {
+    throw new Error('deletePrefix: prefix is required');
+  }
+
+  const normalizedPrefix = prefix.replace(/^\/+|\/+$/g, '');
+  const listPrefix = `${normalizedPrefix}/`;
+
+  for await (const blob of containerClient.listBlobsFlat({ prefix: listPrefix })) {
+    await containerClient.deleteBlob(blob.name).catch(() => null);
+  }
+}
+
 async function walkAndUpload(containerClient, dir, prefix) {
   const entries = await fs.readdir(dir, { withFileTypes: true });
   for (const e of entries) {
@@ -98,3 +111,4 @@ export async function downloadPrefixToDirectory(containerClient, prefix, localDi
   await fs.remove(tempDir);
 
   return { foundAny, localDir, prefix: normalizedPrefix };
+}

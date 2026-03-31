@@ -42,10 +42,10 @@
     }
   },
   "renderOptions": {
-    "out": null,
+    "out": "dog",
     "open": true
   },
   "source": "dashboard-render-submit",
-  "requestedAt": "2026-03-19T16:23:45.772Z",
-  "receivedAt": "2026-03-19T16:23:45.773Z"
+  "requestedAt": "2026-03-31T16:45:32.207Z",
+  "receivedAt": "2026-03-31T16:45:32.195Z"
 }
