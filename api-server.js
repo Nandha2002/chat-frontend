@@ -75,11 +75,14 @@ const CLEAN_INSTANCE_NODE_MODULES = String(
 const FORCE_REBUILD_ON_OUTPUT_REFRESH = String(
   process.env.FORCE_REBUILD_ON_OUTPUT_REFRESH || (IS_AZURE_APP_SERVICE ? 'true' : 'false')
 ).toLowerCase() !== 'false';
+const WEBHOOK_SHARED_SECRET = process.env.WEBHOOK_SHARED_SECRET || '';
+const WEBHOOK_REBUILD_DEBOUNCE_MS = Number(process.env.WEBHOOK_REBUILD_DEBOUNCE_MS || 15000);
 const BLOB_CONTAINER_NAME = process.env.AZURE_STORAGE_CONTAINER || 'generated-sites';
 const BLOB_SYNC_MIN_INTERVAL_MS = Number(process.env.BLOB_SYNC_MIN_INTERVAL_MS || 3000);
 
 let latestBackendConfig = null;
 const lastInstanceSyncAt = new Map();
+const lastWebhookRebuildAt = new Map();
 
 // -------- Helpers --------
 function sendJson(res, statusCode, payload) {
@@ -380,6 +383,35 @@ function getStableBlobPrefix(templateId, instanceName) {
   return `${templateId}/${instanceName}/latest`;
 }
 
+function parseTemplateAndInstanceFromBlobUrl(rawUrl) {
+  if (!rawUrl || typeof rawUrl !== 'string') return null;
+
+  let u;
+  try {
+    u = new URL(rawUrl);
+  } catch {
+    return null;
+  }
+
+  const segments = decodeURIComponent(u.pathname)
+    .split('/')
+    .filter(Boolean);
+
+  if (segments.length < 5) return null;
+
+  const [container, templateId, instanceName, latest, sourceKind] = segments;
+  if (container !== BLOB_CONTAINER_NAME) return null;
+  if (latest !== 'latest') return null;
+  if (sourceKind !== 'src') return null;
+
+  const fileName = segments[segments.length - 1] || '';
+  const ext = path.extname(fileName).toLowerCase();
+  const allowed = new Set(['.jsx', '.js', '.css', '.json', '.tsx', '.ts']);
+  if (!allowed.has(ext)) return null;
+
+  return { templateId, instanceName, fileName, ext };
+}
+
 async function syncInstanceFromBlobIfEnabled(instance) {
   if (!BLOB_SYNC_ENABLED || !instance || !instance.templateId) return { synced: false, reason: 'disabled-or-missing-template' };
 
@@ -438,6 +470,27 @@ async function publishInstanceToBlob(templateId, instanceName, outDir) {
     blobPrefix,
     blobBaseUrl,
     durableUrl: hasDist ? `${blobBaseUrl}dist/index.html` : `${blobBaseUrl}index.html`
+  };
+}
+
+async function publishDistOnlyToBlob(templateId, instanceName, outDir) {
+  const distDir = path.join(outDir, 'dist');
+  const hasDist = await fs.pathExists(path.join(distDir, 'index.html'));
+  if (!hasDist) {
+    return { published: false, reason: 'dist-missing' };
+  }
+
+  const container = await ensureContainer(BLOB_CONTAINER_NAME);
+  const blobPrefix = getStableBlobPrefix(templateId, instanceName);
+  const distPrefix = `${blobPrefix}/dist`;
+  await deletePrefix(container, distPrefix);
+  const distBaseUrl = await uploadDirectory(container, distDir, distPrefix);
+
+  return {
+    published: true,
+    blobPrefix,
+    distBaseUrl,
+    durableUrl: `${distBaseUrl}index.html`
   };
 }
 
@@ -528,6 +581,101 @@ const server = http.createServer(async (req, res) => {
         sendJson(res, 200, { success: true, message: 'Backend render payload received', stored, forward });
       } catch (err) {
         sendJson(res, 500, { error: 'Failed to process backend render payload', details: err instanceof Error ? err.message : String(err) });
+      }
+      return;
+    }
+
+    // ---- Blob Event Grid webhook ----
+    if (method === 'POST' && url.pathname === '/webhooks/blob-events') {
+      try {
+        if (WEBHOOK_SHARED_SECRET) {
+          const headerSecret = String(req.headers['x-webhook-secret'] || '');
+          const querySecret = String(url.searchParams.get('secret') || '');
+          if (headerSecret !== WEBHOOK_SHARED_SECRET && querySecret !== WEBHOOK_SHARED_SECRET) {
+            sendJson(res, 401, { error: 'Invalid webhook secret' });
+            return;
+          }
+        }
+
+        const body = await readJsonBody(req);
+        const events = Array.isArray(body) ? body : [body];
+
+        const validationEvent = events.find((e) => e && e.eventType === 'Microsoft.EventGrid.SubscriptionValidationEvent');
+        if (validationEvent?.data?.validationCode) {
+          sendJson(res, 200, { validationResponse: validationEvent.data.validationCode });
+          return;
+        }
+
+        const eventCandidates = [];
+        for (const evt of events) {
+          if (!evt || typeof evt !== 'object') continue;
+          const t = String(evt.eventType || '');
+          if (t !== 'Microsoft.Storage.BlobCreated' && t !== 'Microsoft.Storage.BlobRenamed') continue;
+          const parsed = parseTemplateAndInstanceFromBlobUrl(evt?.data?.url);
+          if (!parsed) continue;
+          eventCandidates.push({
+            ...parsed,
+            eventType: t,
+            eventTime: evt.eventTime ? Date.parse(String(evt.eventTime)) : Date.now()
+          });
+        }
+
+        const byInstance = new Map();
+        for (const c of eventCandidates) {
+          const key = `${c.templateId}/${c.instanceName}`;
+          const prev = byInstance.get(key);
+          if (!prev || c.eventTime > prev.eventTime) {
+            byInstance.set(key, c);
+          }
+        }
+
+        const processed = [];
+        for (const candidate of byInstance.values()) {
+          const key = `${candidate.templateId}/${candidate.instanceName}`;
+          const now = Date.now();
+          const last = lastWebhookRebuildAt.get(key) || 0;
+          if (now - last < WEBHOOK_REBUILD_DEBOUNCE_MS) {
+            processed.push({ ...candidate, skipped: true, reason: 'debounced' });
+            continue;
+          }
+
+          const outDir = path.resolve(OUTPUT_ROOT, path.basename(candidate.instanceName));
+          await fs.ensureDir(outDir);
+
+          const container = await ensureContainer(BLOB_CONTAINER_NAME);
+          const blobPrefix = getStableBlobPrefix(candidate.templateId, candidate.instanceName);
+          const synced = await downloadPrefixToDirectory(container, blobPrefix, outDir);
+          if (!synced.foundAny) {
+            processed.push({ ...candidate, skipped: true, reason: 'no-blob-content', blobPrefix });
+            continue;
+          }
+
+          await writeInstanceMeta(outDir, candidate.templateId, null);
+          const launchInfo = await prepareLaunchableOutput(outDir);
+          const published = await publishDistOnlyToBlob(candidate.templateId, candidate.instanceName, outDir);
+          lastWebhookRebuildAt.set(key, now);
+
+          processed.push({
+            ...candidate,
+            synced: true,
+            rebuilt: true,
+            openUrl: launchInfo.launchUrl,
+            durableUrl: published.durableUrl || null
+          });
+        }
+
+        sendJson(res, 200, {
+          success: true,
+          received: events.length,
+          matched: eventCandidates.length,
+          processedCount: processed.length,
+          processed
+        });
+      } catch (err) {
+        sendJson(res, 500, {
+          error: 'Failed to process blob webhook',
+          details: err instanceof Error ? err.message : String(err)
+        });
       }
       return;
     }
@@ -906,6 +1054,7 @@ const server = http.createServer(async (req, res) => {
         'GET /instances/:name',
         'POST /instances/:name/sync',
         'POST /instances/:name/rebuild-and-publish',
+        'POST /webhooks/blob-events',
         'GET /outputs/*',
         'POST /render',
         'POST /backend/render-config',

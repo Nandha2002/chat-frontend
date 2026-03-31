@@ -263,6 +263,8 @@ This makes it possible to directly edit source files in blob storage and have th
 - `APP_DATA_ROOT` (optional, default: `/home/site/data` on Azure App Service; project root locally)
 - `OUTPUT_ROOT` (optional, overrides generated instance folder location)
 - `TMP_ROOT` (optional, overrides backend payload snapshot/history temp folder)
+- `WEBHOOK_SHARED_SECRET` (optional but recommended; protects blob webhook endpoint)
+- `WEBHOOK_REBUILD_DEBOUNCE_MS` (optional, default: `15000`)
 
 ### Sync behavior
 
@@ -271,6 +273,26 @@ This makes it possible to directly edit source files in blob storage and have th
   - If blob has newer/edited files, local instance content is refreshed.
 
 If blob storage is unavailable, existing local instance files continue to work.
+
+## Static Blob URL Auto-Update (Event Grid)
+
+To make direct blob URLs like `.../latest/dist/index.html` update after editing source files in blob storage:
+
+1. Configure Event Grid on your storage account for blob events.
+2. Set webhook endpoint to:
+  - `POST https://<your-webapp>.azurewebsites.net/webhooks/blob-events`
+  - Or `POST https://<your-webapp>.azurewebsites.net/webhooks/blob-events?secret=<WEBHOOK_SHARED_SECRET>`
+3. Filter events to source edits only:
+  - Event types: `Microsoft.Storage.BlobCreated`, `Microsoft.Storage.BlobRenamed`
+  - Subject contains: `/latest/src/`
+  - Subject ends with: `.jsx` (add `.js`, `.css`, `.json` if needed)
+
+When these events arrive, the server automatically:
+- Downloads latest source from blob
+- Rebuilds app dist
+- Publishes only `dist/` back to blob under `.../latest/dist/`
+
+This keeps static blob URLs up to date without manual rebuild calls.
 
 ## Notes
 
