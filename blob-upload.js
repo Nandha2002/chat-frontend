@@ -84,10 +84,47 @@ export async function downloadPrefixToDirectory(containerClient, prefix, localDi
     return { foundAny, localDir, prefix: normalizedPrefix };
   }
 
-  // Merge synced source into existing instance directory so local node_modules can be reused.
+  // Merge synced source into existing instance: only overwrite dist/ (build artifacts).
+  // Skip src/ files to preserve user edits, and skip files that exist locally.
+  // This prevents blob sync from wiping out local JSX changes.
   await fs.ensureDir(localDir);
-  await fs.copy(tempDir, localDir, { overwrite: true });
+
+  // Walk tempDir and selectively merge
+  await walkAndMerge(tempDir, localDir, normalizedPrefix);
   await fs.remove(tempDir);
 
   return { foundAny, localDir, prefix: normalizedPrefix };
+}
+
+export async function walkAndMerge(tempDir, localDir, prefix) {
+  const entries = await fs.readdir(tempDir, { withFileTypes: true });
+  for (const ent of entries) {
+    const tempPath = path.join(tempDir, ent.name);
+    const localPath = path.join(localDir, ent.name);
+    const isDir = ent.isDirectory();
+
+    // Always overwrite dist/ (build artifacts must be replaced)
+    if (ent.name === 'dist') {
+      await fs.remove(localPath).catch(() => null);
+      await fs.copy(tempPath, localPath, { overwrite: true });
+    }
+    // Skip src/ unless local doesn't exist (preserve user edits)
+    else if (ent.name === 'src') {
+      if (!await fs.pathExists(localPath)) {
+        await fs.copy(tempPath, localPath, { overwrite: true });
+      }
+      // else: skip, keep local edits
+    }
+    // For directories: recurse with same logic
+    else if (isDir) {
+      await fs.ensureDir(localPath);
+      await walkAndMerge(tempPath, localPath, prefix);
+    }
+    // For files: only copy if local doesn't exist (preserve user modifications)
+    else {
+      if (!await fs.pathExists(localPath)) {
+        await fs.copy(tempPath, localPath);
+      }
+    }
+  }
 }
