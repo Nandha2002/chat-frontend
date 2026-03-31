@@ -69,6 +69,9 @@ const HAS_BLOB_CONNECTION = !!process.env.AZURE_STORAGE_CONNECTION_STRING;
 const BLOB_SYNC_ENABLED = String(
   process.env.ENABLE_BLOB_SYNC || (HAS_BLOB_CONNECTION ? 'true' : 'false')
 ).toLowerCase() !== 'false';
+const CLEAN_INSTANCE_NODE_MODULES = String(
+  process.env.CLEAN_INSTANCE_NODE_MODULES || (IS_AZURE_APP_SERVICE ? 'true' : 'false')
+).toLowerCase() !== 'false';
 const BLOB_CONTAINER_NAME = process.env.AZURE_STORAGE_CONTAINER || 'generated-sites';
 const BLOB_SYNC_MIN_INTERVAL_MS = Number(process.env.BLOB_SYNC_MIN_INTERVAL_MS || 3000);
 
@@ -236,8 +239,13 @@ async function prepareLaunchableOutput(outDir) {
 
   const nodeModulesPath = path.join(outDir, 'node_modules');
 
+  if (CLEAN_INSTANCE_NODE_MODULES) {
+    // Prevent cross-platform native binary reuse (for example esbuild) on Azure Linux workers.
+    await fs.remove(nodeModulesPath).catch(() => null);
+  }
+
   if (!(await fs.pathExists(nodeModulesPath))) {
-    const install = await runNpm(['install']);
+    const install = await runNpm(['install', '--no-audit', '--no-fund']);
     buildLogs += install.stdout + install.stderr;
     if (install.code !== 0) {
       throw new Error(`npm install failed for ${outDir}\n${install.stderr || install.stdout}`);
